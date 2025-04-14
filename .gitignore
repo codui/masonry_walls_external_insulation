@@ -1,0 +1,7 @@
+.mypy_cache
+info
+/masonry_walls_venv
+/demo_work
+.env
+exp.py
+masonry_walls_exp.py
