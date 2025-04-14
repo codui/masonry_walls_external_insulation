@@ -184,7 +184,9 @@ def edit_form(driver):
     # ! Заполняем поле ввода contractors_q_a_form_ref_numb_xpath
     insert_data_into_field(wait, contractors_q_a_form_ref_numb_xpath, "BMS01.G01")
     # ! Заполняем поле ввода contractors_q_a_form_name_title_xpath
-    insert_data_into_field(wait, contractors_q_a_form_name_title_xpath, "Quality policy")
+    insert_data_into_field(
+        wait, contractors_q_a_form_name_title_xpath, "Quality policy"
+    )
     # ! Заполняем поле ввода area_of_inspection_xpath
     insert_data_into_field(wait, area_of_inspection_xpath, "E Refuse")
     # Получаем кнопку "Update" и делаем на ней клик
@@ -307,31 +309,47 @@ def click_arrow_to_open_level(driver, number_line):
 
 
 @check_session
-def click_card_in_progress(driver, number_line):
+def click_select_form_action(driver, number_line):
     wait = WebDriverWait(driver, 10)
-    card_in_progress_xpath = (
-        f'//*[@id="table_body_content_scroller"]/div/div[{number_line}]/div/div[34]'
+    btn_select_form_action_xpath = f'//*[@id="table_body_content_scroller"]/div/div[{number_line}]/div/div[35]/div/img'
+    btn_select_form_action = wait.until(
+        EC.visibility_of_element_located((By.XPATH, btn_select_form_action_xpath))
     )
-    card_in_progress = wait.until(
-        EC.visibility_of_element_located((By.XPATH, card_in_progress_xpath))
-    )
-    # Если карточка содержит надпись "in progress"
-    if card_in_progress.text.lower() == "in progress":
-        card_in_progress.find_element(By.CSS_SELECTOR, "span.ng-star-inserted")
+    # Если получили элемент btn_select_form_action
+    if btn_select_form_action:
         # Скрол до нужного элемента с Python или с Javascript
         # driver.execute_script("arguments[0].scrollIntoView(true);", btn_open_new_tab)
-        ActionChains(driver).scroll_to_element(card_in_progress).perform()
-        time.sleep(0.5)
-        wait.until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "span.ng-star-inserted"))
-        )
+        ActionChains(driver).scroll_to_element(btn_select_form_action).perform()
+        # time.sleep(0.5)
+        wait.until(EC.element_to_be_clickable((By.XPATH, btn_select_form_action_xpath)))
+        # time.sleep(0.5)
         try:
             # Открыть форму в новой вкладке
-            card_in_progress.click()
+            btn_select_form_action.click()
         except ElementClickInterceptedException:
             print("Work ElementClickInterceptedException")
             # Используем JavaScript для клика, если элемент перекрыт
-            driver.execute_script("arguments[0].click();", card_in_progress)
+            driver.execute_script("arguments[0].click();", btn_select_form_action)
+    return driver
+
+
+@check_session
+def click_btn_create_form(driver, number_line):
+    wait = WebDriverWait(driver, 10)
+    select_form_action = '//*[@id="subscriptionPlanId-2"]/ngb-modal-window'
+    # Ждем пока появится модальное окно
+    wait.until(
+        EC.text_to_be_present_in_element_attribute(
+            (By.XPATH, select_form_action), "class", "form-modal"
+        )
+    )
+    btn_create_form_xpath = (
+        '//*[@id="subscriptionPlanId-2"]/ngb-modal-window/div/div/div[2]/div[1]/img'
+    )
+    btn_create_form = wait.until(
+        EC.visibility_of_element_located((By.XPATH, btn_create_form_xpath))
+    )
+    btn_create_form.click()
     return driver
 
 
@@ -501,11 +519,6 @@ def moving_through_quality_checklist(
     """
     # Слово для остановки работы скрипта
     stop_word: bool = True
-    click_on: dict[str, Callable[[webdriver.Chrome, int], webdriver.Chrome]] = {
-        "block": click_arrow_to_open_block,
-        "level": click_arrow_to_open_level,
-        "plot": click_card_in_progress,
-    }
     while stop_word:
         # Получить название текущей ячейки - Block, Level (этаж), Plot (квартира)
         driver, location_title = get_location_title(driver, number_line)
@@ -516,17 +529,17 @@ def moving_through_quality_checklist(
             # ! PROCESS SECTION Block
             if "block" in location_title:
                 if not letter_block_to_start:
-                    driver = click_on["block"](driver, number_line)
+                    driver = click_arrow_to_open_block(driver, number_line)
                 elif location_title == f"block {letter_block_to_start}":
                     letter_block_to_start = False
-                    driver = click_on["block"](driver, number_line)
+                    driver = click_arrow_to_open_block(driver, number_line)
             # ! PROCESS SECTION Level
             elif "level" in location_title:
                 if not number_level_to_start:
-                    driver = click_on["level"](driver, number_line)
+                    driver = click_arrow_to_open_level(driver, number_line)
                 elif location_title == f"level {number_level_to_start}":
                     number_level_to_start = False
-                    driver = click_on["level"](driver, number_line)
+                    driver = click_arrow_to_open_level(driver, number_line)
             # ! PROCESS SECTION Plot
             elif "plot" in location_title:
                 if (
@@ -534,15 +547,11 @@ def moving_through_quality_checklist(
                     or location_title == f"plot {number_plot_to_start}"
                 ):
                     number_plot_to_start = False
-                    driver = click_on["plot"](driver, number_line)
-                    # Если открыта новая (вторая) вкладка
-                    if len(driver.window_handles) > 1:
-                        # Переключиться на новую вкладку
-                        driver = switch_to_new_tab(driver)
-                        # Обрабоать страницу
-                        driver = processs_form_qc4j_side_rise_rain_screen_firebreak(
-                            driver
-                        )
+                    driver = click_select_form_action(driver, number_line)
+                    driver = click_btn_create_form(driver, number_line)
+                    time.sleep(5)
+                    break
+                    driver = processs_form_qc4j_side_rise_rain_screen_firebreak(driver)
         number_line += 1
     return driver
 
